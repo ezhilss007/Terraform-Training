@@ -3,30 +3,40 @@ trigger:
 
 pool:
   name: TerraformTraining
+jobs:
+- job:'Terraform Init and Plan'
+  displayName: 'Terraform Init and Plan'
+  steps:
+   - checkout: self
+   - task: PowerShell@2
+     displayName: 'Terraform Init and Plan'
+     inputs:
 
-steps:
+        targetType: 'inline' 
+        script: |
+            $clientfolder = "$(Build.SourcesDirectory) \Terraform-MRR\$(clientsn) -$(environmentName)"
+            Write-Host "$clientfolder"
+            StfvarsContent = Get-Content "$clientfolder\terraform.tfvars"
+            $envvalue = ($tfvarsContent | Select-string -Pattern '^environmentName\s*-\s*"(.*)). Matches. Groups [1]. Value
+            $clientcodeValue = ($tfvarsContent | Select-String -Pattern ^clientsn\s*-\s*" (.) *). Matches. Groups[1]. Value
+            $terraformversion - ($tfvarsContent | Select-String -Pattern '^tfversion\s*-\s*"(.*)"') Matches. Groups [1]. Value
+            $subscription = ($tfvarsContent | select-String -Pattern '^azure-subscription-id\s*-\s*"(.*)"') . Matches.Groups[1]. Value
+            Write-Output "##vso[task.setvariable variable-environmentName; isoutput-true]senvValue" Write-Output "##vso[task.setvariable variable-clientsn;isOutput-true]$clientcodevalue" Write-Output "##so[task.setvariable variable-tfversion; isoutput-true]sterraformversion"
+            Write-Output "##so[task.setvariable variable-azure-subscription-id; isoutput-true]$subscription"
+  -  task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@1
+     displayName: "Install Terraform' 
+     inputs:
+        terraformVersion: $(ExtractingVariables tfversion)
+        
+  - task: ms-devlabs. custom-terraform-tasks.custom-terraform-release-task.TerraformTaskv4@4
+    displayName: 'Terraform: init" 
+    inputs:
+       workingDirectory: '$(Build.SourcesDirectory) \Terraform-MRR\$(clientsn) -$(environmentName)'
+       command: 'init'
 
-# Install Terraform
-- script: |
-    sudo apt-get update
-    sudo apt-get install -y wget unzip
-    wget https://releases.hashicorp.com/terraform/1.7.5/terraform_1.7.5_linux_amd64.zip
-    unzip terraform_1.7.5_linux_amd64.zip
-    sudo mv terraform /usr/local/bin/
-    terraform -version
-  displayName: 'Install Terraform'
-
-# Initialize Terraform
-- script: |
-    terraform init
-  displayName: 'Terraform Init'
-
-# Validate Terraform files
-- script: |
-    terraform validate
-  displayName: 'Terraform Validate'
-
-# Run Terraform Plan
-- script: |
-    terraform plan
-  displayName: 'Terraform Plan'
+  - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskv4@4
+    displayName: 'Terraform: plan' 
+    inputs:
+       workingDirectory: '$(Build.SourcesDirectory) \Terraform-MRR\$(clientsn) -$(environmentName)'
+       command: 'plan'
+       commandOptions: '-var-file="$(build.sourcesDirectory)\Terraform-MRR\$(clientsn)-$(environmentName)\terraform.tfvars"'
