@@ -1,19 +1,42 @@
-# Starter pipeline
-# Start with a minimal pipeline that you can customize to build and deploy your code.
-# Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
-
 trigger:
 - main
 
 pool:
-  vmImage: ubuntu-latest
+  name: TerraformTraining
+jobs:
+- job:'Terraform Init and Plan'
+  displayName: 'Terraform Init and Plan'
+  steps:
+   - checkout: self
+   - task: PowerShell@2
+     displayName: 'Terraform Init and Plan'
+     inputs:
 
-steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
+        targetType: 'inline' 
+        script: |
+            $clientfolder = "$(Build.SourcesDirectory) \Terraform-MRR\$(clientsn) -$(environmentName)"
+            Write-Host "$clientfolder"
+            StfvarsContent = Get-Content "$clientfolder\terraform.tfvars"
+            $envvalue = ($tfvarsContent | Select-string -Pattern '^environmentName\s*-\s*"(.*)). Matches. Groups [1]. Value
+            $clientcodeValue = ($tfvarsContent | Select-String -Pattern ^clientsn\s*-\s*" (.) *). Matches. Groups[1]. Value
+            $terraformversion - ($tfvarsContent | Select-String -Pattern '^tfversion\s*-\s*"(.*)"') Matches. Groups [1]. Value
+            $subscription = ($tfvarsContent | select-String -Pattern '^azure-subscription-id\s*-\s*"(.*)"') . Matches.Groups[1]. Value
+            Write-Output "##vso[task.setvariable variable-environmentName; isoutput-true]senvValue" Write-Output "##vso[task.setvariable variable-clientsn;isOutput-true]$clientcodevalue" Write-Output "##so[task.setvariable variable-tfversion; isoutput-true]sterraformversion"
+            Write-Output "##so[task.setvariable variable-azure-subscription-id; isoutput-true]$subscription"
+  -  task: ms-devlabs.custom-terraform-tasks.custom-terraform-installer-task.TerraformInstaller@1
+     displayName: "Install Terraform' 
+     inputs:
+        terraformVersion: $(ExtractingVariables tfversion)
+        
+  - task: ms-devlabs. custom-terraform-tasks.custom-terraform-release-task.TerraformTaskv4@4
+    displayName: 'Terraform: init" 
+    inputs:
+       workingDirectory: '$(Build.SourcesDirectory) \Terraform-MRR\$(clientsn) -$(environmentName)'
+       command: 'init'
 
-- script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
-  displayName: 'Run a multi-line script'
+  - task: ms-devlabs.custom-terraform-tasks.custom-terraform-release-task.TerraformTaskv4@4
+    displayName: 'Terraform: plan' 
+    inputs:
+       workingDirectory: '$(Build.SourcesDirectory) \Terraform-MRR\$(clientsn) -$(environmentName)'
+       command: 'plan'
+       commandOptions: '-var-file="$(build.sourcesDirectory)\Terraform-MRR\$(clientsn)-$(environmentName)\terraform.tfvars"'
